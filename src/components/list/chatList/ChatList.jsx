@@ -6,6 +6,8 @@ import { db } from "../../../lib/firebase";
 import { onSnapshot, doc, getDoc } from "firebase/firestore";
 
 const ChatList = () => {
+
+  // Initially chats is going to be an empty array.
   const [chats, setChats] = useState([]);
   const [addMode, setAddMode] = useState(false);
 
@@ -18,9 +20,14 @@ const ChatList = () => {
     const unSub = onSnapshot(doc(db, "userchats", currentUser.id), async (res) => {
       const items = res.data().chats;
 
+      // Using each chat we are going to pull up the user.
       // Since we have a list here we can use promise all to fetch all the data at once.
       const promises = items.map(async (item) => {
+
+        // We use the receiverId to get the user
         const userDocRef = doc(db, "users", item.receiverId);
+
+        // We use getDoc to get the user
         const userDocSnap = await getDoc(userDocRef);
 
         // Finally it's going to return us the user
@@ -28,7 +35,10 @@ const ChatList = () => {
         return { ...item, user };
       });
 
+      // We fulfill all the promises.
       const chatData = await Promise.all(promises);
+
+      // use setChats from useState hook to update the chats array.
       setChats(chatData.sort((a, b) => b.updatedAt - a.updatedAt));
     });
 
@@ -49,8 +59,8 @@ const ChatList = () => {
         <div className="item">
           <img src="./avatar.png" alt="" />
           <div className="texts">
-            <span>User Name</span>
-            <p>Hello</p>
+            <span>{}</span>
+            <p>{chat.lastMessage}</p>
           </div>
         </div>
       ))}
