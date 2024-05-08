@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AddUser from "./addUser/AddUser";
 import "./chatList.css";
 import { useUserStore } from "../../../lib/userStore";
+import { useChatStore } from "../../../lib/chatStore";
 import { db } from "../../../lib/firebase";
 import { onSnapshot, doc, getDoc } from "firebase/firestore";
 
@@ -11,8 +12,8 @@ const ChatList = () => {
   const [chats, setChats] = useState([]);
   const [addMode, setAddMode] = useState(false);
 
-
   const { currentUser } = useUserStore();
+  const { chatId, changeChat } = useChatStore();
 
   // Whenever we run this page, this component it's going to automatically fetch this data.
   // After fetching we are going to store it somewhere.
@@ -45,6 +46,10 @@ const ChatList = () => {
     return () => { unSub() };
   }, [currentUser.id]);
 
+  const handleSelect = async (chat) => {
+    changeChat(chat.chatId, chat.user);
+  }
+
   return (
     <div className='chatList'>
       <div className="search">
@@ -56,15 +61,14 @@ const ChatList = () => {
       </div>
       {/* We import our chats here */}
       {chats.map((chat) => (
-        <div className="item">
-          <img src="./avatar.png" alt="" />
+        <div className="item" key ={chat.chatId} onClick={()=>handleSelect(chat)}>
+          <img src={chat.user.avatar || "./avatar.png"} alt="" />
           <div className="texts">
-            <span>{}</span>
+            <span>{chat.user.username}</span>
             <p>{chat.lastMessage}</p>
           </div>
         </div>
       ))}
-
       {addMode && <AddUser />}
     </div>
   );

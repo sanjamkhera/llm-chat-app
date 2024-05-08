@@ -1,14 +1,36 @@
 import "./chat.css";
 import EmojiPicker from "emoji-picker-react";
 import React, { useEffect, useState } from 'react';
+import { db } from "../../lib/firebase";
+import { onSnapshot, doc } from "firebase/firestore";
+import { useChatStore } from "../../lib/chatStore";
 
 const Chat = () => {
+  const [chat, setChat] = useState();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const endRef = React.useRef(null);
+  const { chatId } = useChatStore();
+
+  // Takes us to the latest message
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  // Listening to realtime data
+  // for now we are going to copy a dummy id from data base
+  // then we will use the chatStore to get the chat id
+  useEffect(() => {
+    // Using the response we can set our chat
+    const unSub = onSnapshot(doc(db, "chats", chatId), (res) => {
+      setChat(res.data());
+    });
+
+    // Clean up function 
+    return () => { unSub() };
+  }, [ chatId ]);
+
+  console.log(chat);
 
   const handleEmoji = (event) => {
     setText(prev => prev + event.emoji);
@@ -52,7 +74,7 @@ const Chat = () => {
         </div>
         <div className="message own">
           <div className="texts">
-          <img src="./avatar.png" alt="" />
+            <img src="./avatar.png" alt="" />
             <p>
               Lorem ipsum dolor sit amet consectetur adipisicing elit. Voluptatibus, non.
             </p>
