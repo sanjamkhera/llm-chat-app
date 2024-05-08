@@ -8,38 +8,27 @@ import { onSnapshot, doc, getDoc, updateDoc } from "firebase/firestore";
 
 const ChatList = () => {
 
-  // Initially chats is going to be an empty array.
   const [chats, setChats] = useState([]);
   const [addMode, setAddMode] = useState(false);
+  const [input, setInput] = useState("");
 
   const { currentUser } = useUserStore();
   const { chatId, changeChat } = useChatStore();
 
-  // Whenever we run this page, this component it's going to automatically fetch this data.
-  // After fetching we are going to store it somewhere.
+
   useEffect(() => {
     const unSub = onSnapshot(doc(db, "userchats", currentUser.id), async (res) => {
       const items = res.data().chats;
 
-      // Using each chat we are going to pull up the user.
-      // Since we have a list here we can use promise all to fetch all the data at once.
       const promises = items.map(async (item) => {
-
-        // We use the receiverId to get the user
         const userDocRef = doc(db, "users", item.receiverId);
-
-        // We use getDoc to get the user
         const userDocSnap = await getDoc(userDocRef);
-
-        // Finally it's going to return us the user
         const user = userDocSnap.data();
         return { ...item, user };
       });
 
-      // We fulfill all the promises.
       const chatData = await Promise.all(promises);
 
-      // use setChats from useState hook to update the chats array.
       setChats(chatData.sort((a, b) => b.updatedAt - a.updatedAt));
     });
 
@@ -47,24 +36,54 @@ const ChatList = () => {
   }, [currentUser.id]);
 
   const handleSelect = async (chat) => {
-    changeChat(chat.chatId, chat.user);
+    const userChats = chats.map(item => {
+      const { user, ...rest } = item;
+      return rest;
+    });
+
+    const chatIndex = userChats.findIndex(item => item.chatId === chat.chatId);
+    userChats[chatIndex].isSeen = true;
+
+    // Now we update the user chats
+    const userChatsRef = doc(db, "userchats", currentUser.id);
+
+    try {
+      await updateDoc(userChatsRef, { chats: userChats })
+      changeChat(chat.chatId, chat.user);
+    } catch (err) {
+      console.log(err);
+    }
   }
+
+  const filteredChats = chats.filter((c) => c.user.username.toLowerCase().includes(input.toLowerCase()));
 
   return (
     <div className='chatList'>
       <div className="search">
         <div className="searchBar">
           <img src="./search.png" alt="" />
-          <input type="text" placeholder="Search" />
+          <input type="text" placeholder="Search" onChange={(e)=>setInput(e.target.value)}/>
         </div>
         <img src={addMode ? "./minus.png" : "./plus.png"} alt="" className="add" onClick={() => setAddMode(prev => !prev)} />
       </div>
       {/* We import our chats here */}
-      {chats.map((chat) => (
-        <div className="item" key ={chat.chatId} onClick={()=>handleSelect(chat)}>
-          <img src={chat.user.avatar || "./avatar.png"} alt="" />
+      {filteredChats.map((chat) => (
+        <div className="item"
+          key={chat.chatId}
+          onClick={() => handleSelect(chat)}
+          style={{ backgroundColor: chat?.isSeen ? "transparent" : "#5183FE" }}>
+          <img src=
+            {chat.user.blocked.includes(currentUser.id)
+              ? "./avatar.png"
+              : chat.user.avatar
+              || "./avatar.png"} alt=""
+          />
           <div className="texts">
-            <span>{chat.user.username}</span>
+            <span>
+              {chat.user.blocked.includes(currentUser.id)
+                ? "User"
+                : chat.user.username}
+            </span>
             <p>{chat.lastMessage}</p>
           </div>
         </div>
