@@ -2,15 +2,18 @@ import "./chat.css";
 import EmojiPicker from "emoji-picker-react";
 import React, { useEffect, useState } from 'react';
 import { db } from "../../lib/firebase";
-import { onSnapshot, doc } from "firebase/firestore";
+import { onSnapshot, doc, arrayUnion, getDoc } from "firebase/firestore";
 import { useChatStore } from "../../lib/chatStore";
+import { useUserStore } from "../../lib/userStore";
+import { updateDoc } from "firebase/firestore";
 
 const Chat = () => {
   const [chat, setChat] = useState();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const endRef = React.useRef(null);
-  const { chatId } = useChatStore();
+  const { currentUser } = useUserStore();
+  const { chatId, user } = useChatStore();
 
   // Takes us to the latest message
   useEffect(() => {
@@ -28,13 +31,45 @@ const Chat = () => {
 
     // Clean up function 
     return () => { unSub() };
-  }, [ chatId ]);
+  }, [chatId]);
 
   console.log(chat);
 
   const handleEmoji = (event) => {
     setText(prev => prev + event.emoji);
     setOpen(false);
+  }
+
+  const handleSend = async () => {
+    if (text === "") return;
+
+    try {
+      await updateDoc(doc(db, "chats", chatId), {
+        messages: arrayUnion({
+          senderId: currentUser.id,
+          text,
+          createdAt: new Date(),
+        }),
+      });
+      // Using this array we can run exactly the same thing and update the other user.
+      const userIDs = [currentUser.id, user.id];
+      userIDs.forEach(async (id) => {
+        const userChatRef = doc(db, "userchats", id);
+        const userChatsSnapshot = await getDoc(userChatRef);
+        if (userChatsSnapshot.exists()) {
+          const userChatsData = userChatsSnapshot.data();
+          // We find the last index of the chat.
+          // This will tell us which index number to update.
+          const chatIndex = userChatsData.chats.findIndex((c) => c.chatId === chatId);
+          userChatsData.chats[chatIndex].lastMessage = text;
+          userChatsData.chats[chatIndex].isSeen = id === currentUser.id ? true : false;
+          userChatsData.chats[chatIndex].updatedAt = Date.now();
+          await updateDoc(userChatRef, { chats: userChatsData.chats, });
+        }
+      });
+    } catch (err) {
+      console.log(err);
+    }
   }
 
   console.log(text);
@@ -55,41 +90,17 @@ const Chat = () => {
         </div>
       </div>
       <div className="center">
-        <div className="message own">
-          <div className="texts">
-            <p>
-              Lorem ipsum dolor sit amet consectetur adipisicing elit. Voluptatibus, non.
-            </p>
-            <span>1 min ago</span>
+        {chat?.messages?.map(message => (
+          <div className="message own" key={message?.createAt}>
+            <div className="texts">
+              {message.img && <img src={message.img} alt="" />}
+              <p>
+                {message.text}
+              </p>
+              <span>1 min ago</span>
+            </div>
           </div>
-        </div>
-        <div className="message">
-          <img src="./avatar.png" alt="" />
-          <div className="texts">
-            <p>
-              Lorem ipsum dolor sit amet consectetur adipisicing elit. Voluptatibus, non.
-            </p>
-            <span>1 min ago</span>
-          </div>
-        </div>
-        <div className="message own">
-          <div className="texts">
-            <img src="./avatar.png" alt="" />
-            <p>
-              Lorem ipsum dolor sit amet consectetur adipisicing elit. Voluptatibus, non.
-            </p>
-            <span>1 min ago</span>
-          </div>
-        </div>
-        <div className="message">
-          <img src="./avatar.png" alt="" />
-          <div className="texts">
-            <p>
-              Lorem ipsum dolor sit amet consectetur adipisicing elit. Voluptatibus, non.
-            </p>
-            <span>1 min ago</span>
-          </div>
-        </div>
+        ))}
         <div ref={endRef}></div>
       </div>
       <div className="bottom">
@@ -109,7 +120,7 @@ const Chat = () => {
             <EmojiPicker open={open} onEmojiClick={handleEmoji} />
           </div>
         </div>
-        <button className="sendButton">Send</button>
+        <button className="sendButton" onClick={handleSend}>Send</button>
       </div>
     </div>
   );

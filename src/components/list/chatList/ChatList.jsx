@@ -4,7 +4,7 @@ import "./chatList.css";
 import { useUserStore } from "../../../lib/userStore";
 import { useChatStore } from "../../../lib/chatStore";
 import { db } from "../../../lib/firebase";
-import { onSnapshot, doc, getDoc } from "firebase/firestore";
+import { onSnapshot, doc, getDoc, updateDoc } from "firebase/firestore";
 
 const ChatList = () => {
 
